@@ -16,7 +16,7 @@ class Cards:
 
     cards_s_v = []
 
-    cards = {}
+    cards_dict = {}
 
     def gen_cards_s_v(self):
         """
@@ -26,38 +26,43 @@ class Cards:
             for j in self.cards_value:
                 self.cards_s_v.append(j + ' ' + i)
 
-    def gen_cards(self):
+    def gen_cards_dict(self):
         """
         Генерация текстовых обозначений карт и из номинальных значений в цифрах
         """
         for i in range(2):
             self.cards_number += self.cards_number
         for i in range(len(self.cards_s_v)):
-            self.cards[self.cards_s_v[i]] = self.cards_number[i]
+            self.cards_dict[self.cards_s_v[i]] = self.cards_number[i]
 
 
-class StartGame:
+class Game(Cards):
     """
-    Запуск игры и повторный запуск
+    # Запуск игры и повторный запуск !!!!!
     """
     players_scores = []
     dealers_scores = []
+
+    def __init__(self, count=0, player_s_move=True, players_score_count=0,
+                 dealer_score_count=0):
+        self.count = count
+        self.player_s_move = player_s_move
+        self.players_score_count = players_score_count
+        self.dealer_score_count = dealer_score_count
 
     def start_and_repeat_game(self):
         """
         Запуск процесса игры, обнуление значений, перезапуск
         """
-        c = Cards()
-        c.cards_s_v = []
-        c.cards = {}
-        c.gen_cards_s_v()
-        c.gen_cards()
+        self.gen_cards_s_v()
+        self.gen_cards_dict()
 
         while True:
             user_answer = input('Играем?\nВведите "да" или "нет": ')
             if self.validation_user_answer(user_answer):
                 if user_answer == 'да':
-                    gp = GameProcesses(c.cards_s_v, c.cards, count=0, player_s_move=True, players_score_count=0,
+                    self.shuffling_cards()
+                    gp = GameProcesses(count=0, player_s_move=True, players_score_count=0,
                                        dealer_score_count=0)
                     gp.players_cards = []
                     gp.dealers_cards = []
@@ -74,19 +79,37 @@ class StartGame:
         valid_user_answer = ['да', 'нет']
         return True if answer in valid_user_answer else False
 
+    def shuffling_cards(self):
+        """
+        Перемешивание колоды карт
+        """
+        shuffle(self.cards_s_v)
 
-class Player(StartGame):
+    def cards_count(self, cards_for_count):
+        """
+        Подсчет сданных карт
+        """
+        aces = ['туз буби', 'туз пик', 'туз черви', 'туз крести']
+        cards_sum = []
+        for i in cards_for_count:
+            if i in aces and sum(cards_sum) + 11 <= 21:
+                cards_sum.append(self.cards_dict[i][1])
+            elif i in aces and sum(cards_sum) + 11 > 21:
+                cards_sum.append(self.cards_dict[i][0])
+            else:
+                cards_sum.append(self.cards_dict[i])
+        cards_sum = sum(cards_sum)
+        if self.count <= 1:
+            self.players_score_count = cards_sum
+        else:
+            self.dealer_score_count = cards_sum
+        return cards_sum
+
+
+class Player(Game):
     """
     Работа с действиями игрока
     """
-
-    def __init__(self, cards_array, cards_dict, count=0, player_s_move=True, players_score_count=0):
-        self.players_score_count = players_score_count
-        self.player_s_move = player_s_move
-        self.cards_dict = cards_dict
-        self.count = count
-        self.cards_array = cards_array
-
     players_cards = []
 
     def distribution_cards_to_player(self):
@@ -94,11 +117,11 @@ class Player(StartGame):
         Процесс сдачи карт игроку
         """
         if self.player_s_move:
-            self.unpacking_players_cards(self.players_cards, self.players_cards_count())
+            self.unpacking_players_cards(self.players_cards, self.cards_count(self.players_cards))
             if self.player_move():
-                self.players_cards.append(self.cards_array[0])
-                self.cards_array.append(self.cards_array[0])
-                del self.cards_array[0]
+                self.players_cards.append(self.cards_s_v[0])
+                self.cards_s_v.append(self.cards_s_v[0])
+                del self.cards_s_v[0]
         elif self.player_s_move or self.players_score_count > 21:
             self.count += 1
         elif self.players_score_count == 21:
@@ -106,28 +129,11 @@ class Player(StartGame):
         else:
             self.count += 3
 
-    def players_cards_count(self):
-        """
-        Подсчет карт, сданных игроку
-        """
-        aces = ['туз буби', 'туз пик', 'туз черви', 'туз крести']
-        sum_players_cards = []
-        for i in self.players_cards:
-            if i in aces and sum(sum_players_cards) + 11 <= 21:
-                sum_players_cards.append(self.cards_dict[i][1])
-            elif i in aces and sum(sum_players_cards) + 11 > 21:
-                sum_players_cards.append(self.cards_dict[i][0])
-            else:
-                sum_players_cards.append(self.cards_dict[i])
-        sum_players_cards = sum(sum_players_cards)
-        self.players_score_count = sum_players_cards
-        return sum_players_cards
-
     def player_move(self):
         """
         Обработка действий игрока
         """
-        while self.players_cards_count() < 21:
+        while self.cards_count(self.players_cards) < 21:
             get_card = input('Будете брать карту?\nВведите "да" или "нет": ')
             if self.validation_user_answer(get_card):
                 break
@@ -167,22 +173,17 @@ class Dealer(Player):
     """
     dealers_cards = []
 
-    def __init__(self, cards_array, cards_dict, count=0, player_s_move=True, players_score_count=0,
-                 dealer_score_count=0):
-        self.dealer_score_count = dealer_score_count
-        super().__init__(cards_array, cards_dict, count, player_s_move, players_score_count)
-
     def distribution_cards_to_dealer(self):
         """
         Процесс сдачи карт дилеру
         """
         while True:
-            self.unpacking_dealers_cards(self.dealers_cards, self.dealers_cards_count())
+            self.unpacking_dealers_cards(self.dealers_cards, self.cards_count(self.dealers_cards))
             if ((self.dealer_score_count <= 15 and len(self.dealers_cards) <= 3) or
                     self.players_score_count > self.dealer_score_count):
-                self.dealers_cards.append(self.cards_array[0])
-                self.cards_array.append(self.cards_array[0])
-                del self.cards_array[0]
+                self.dealers_cards.append(self.cards_s_v[0])
+                self.cards_s_v.append(self.cards_s_v[0])
+                del self.cards_s_v[0]
             elif self.dealer_score_count > 21:
                 self.count += 1
                 break
@@ -192,23 +193,6 @@ class Dealer(Player):
             else:
                 self.count += 3
                 break
-
-    def dealers_cards_count(self):
-        """
-        Подсчет карт у диллера
-        """
-        aces = ['туз буби', 'туз пик', 'туз черви', 'туз крести']
-        sum_dealers_cards = []
-        for i in self.dealers_cards:
-            if i in aces and sum(sum_dealers_cards) + 11 <= 21:
-                sum_dealers_cards.append(self.cards_dict[i][1])
-            elif i in aces and sum(sum_dealers_cards) + 11 > 21:
-                sum_dealers_cards.append(self.cards_dict[i][0])
-            else:
-                sum_dealers_cards.append(self.cards_dict[i])
-        sum_dealers_cards = sum(sum_dealers_cards)
-        self.dealer_score_count = sum_dealers_cards
-        return sum_dealers_cards
 
     @staticmethod
     def unpacking_dealers_cards(array, sum_array):
@@ -233,26 +217,19 @@ class GameProcesses(Dealer):
     """
     Автоматизация процесса игры
     """
-    def shuffling_cards(self):
-        """
-        Перемешивание колоды карт
-        """
-        shuffle(self.cards_array)
-
     def distribution_cards(self):
         """
         Процесс сдачи карт игроку и дилеру, обработка игровых событий
         """
         while self.count < 8:
             if self.count == 0:
-                self.shuffling_cards()
                 for n, i in enumerate(range(4)):
                     if n % 2 == 0:
-                        self.players_cards.append(self.cards_array[0])
+                        self.players_cards.append(self.cards_s_v[0])
                     else:
-                        self.dealers_cards.append(self.cards_array[0])
-                    self.cards_array.append(self.cards_array[0])
-                    del self.cards_array[0]
+                        self.dealers_cards.append(self.cards_s_v[0])
+                    self.cards_s_v.append(self.cards_s_v[0])
+                    del self.cards_s_v[0]
                 else:
                     self.count += 1
             elif self.count == 1:
@@ -308,5 +285,5 @@ class GameProcesses(Dealer):
         print(f'Общий счёт:\nИгрок: {sum(self.players_scores)}\nДилер: {sum(self.dealers_scores)}')
 
 
-sg = StartGame()
+sg = Game()
 sg.start_and_repeat_game()
